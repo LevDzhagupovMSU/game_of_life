@@ -53,6 +53,16 @@ void testUpdatingKeyDoesNotIncreaseSize() {
     require(cache.Get(7).lock() == replacement, "Updated key must return replacement value");
 }
 
+void testKeysBeyond16BitsRemainDistinct() {
+    cache::LRUCache cache(2);
+    auto first = makeEngine();
+    auto second = makeEngine();
+    cache.Put(1, first);
+    cache.Put(65537, second);
+    require(cache.Get(1).lock() == first, "Low session ID must retain its own engine");
+    require(cache.Get(65537).lock() == second, "64-bit session ID must retain its own engine");
+}
+
 void testZeroCapacityStoresNothing() {
     cache::LRUCache cache(0);
     auto engine = makeEngine();
@@ -95,6 +105,7 @@ int main() {
     try {
         testCapacityEvictsLeastRecentlyUsed();
         testUpdatingKeyDoesNotIncreaseSize();
+        testKeysBeyond16BitsRemainDistinct();
         testZeroCapacityStoresNothing();
         testConcurrentGetPutAndSize();
     } catch (const std::exception& error) {

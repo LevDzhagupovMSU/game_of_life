@@ -11,7 +11,7 @@
 server::Worker::Worker(size_t cache_capacity) : cache_(cache_capacity) {};
 
 void server::Worker::Work(server::ThreadPool::Job job){
-    uint16_t session_id = job.task.session_id;
+    SessionId session_id = job.task.session_id;
     std::weak_ptr<game::GameEngine> engine_ptr;
 
     {

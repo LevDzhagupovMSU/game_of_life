@@ -1,22 +1,32 @@
 #include "server/scheduler.hpp"
 #include "server/thread_pool.hpp"
 
+#include <condition_variable>
 #include <cstdint>
 #include <mutex>
 #include <optional>
+#include <stdexcept>
 #include <thread>
 #include <utility>
 
-server::Task::Task(uint16_t session_id_, std::string payload_, ResultHandler on_result_) : 
+server::Task::Task(SessionId session_id_, std::string payload_, ResultHandler on_result_) :
                     session_id(session_id_), payload(std::move(payload_)), on_result(std::move(on_result_)) {};
 
 server::Scheduler::Scheduler(server::ThreadPool& thread_pool) : 
                     thread_pool_(thread_pool), th_([this]{ DispatchLoop(); }) {};
 
+server::Scheduler::~Scheduler(){
+    Stop();
+}
+
 void server::Scheduler::Submit(Task task){
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        uint16_t id = task.session_id;
+
+        if(stopping_)
+            throw std::runtime_error("Scheduler is stopping, cannot submit new tasks");
+
+        SessionId id = task.session_id;
         queues_[task.session_id].tasks.push(std::move(task));
     
         auto& q = queues_[task.session_id];
@@ -31,18 +41,19 @@ void server::Scheduler::Submit(Task task){
 
 void server::Scheduler::DispatchLoop(){
     for(;;){
-        uint16_t session_id;
+        SessionId session_id;
         std::optional<Task> task; // optional только потому что нет конструктора по умолчанию
 
         {
             std::unique_lock<std::mutex> lock(mutex_);
 
             ready_cv_.wait(lock, [this](){
-                return stopping_ || !ready_sessions_.empty();
+                return (stopping_ && pending_tasks_ == 0) || !ready_sessions_.empty();
             });
 
-            if(stopping_ && pending_tasks_ == 0)
+            if(stopping_ && pending_tasks_ == 0){
                 return;
+            }
 
             session_id = ready_sessions_.front();
             ready_sessions_.pop();
@@ -59,13 +70,22 @@ void server::Scheduler::DispatchLoop(){
             session_queue.tasks.pop();
         }
 
-        thread_pool_.Post({std::move(task.value()), [this, session_id](){
+        auto on_result = task->on_result;
+        try{
+            thread_pool_.Post({std::move(task.value()), [this, session_id](){
+                release(session_id);
+            }});
+        }catch(const std::exception& e){
+            try { on_result(std::string(e.what())); } catch(...) {}
             release(session_id);
-        }});
+        }catch(...){
+            try { on_result(std::string("Task dispatch failed")); } catch(...) {}
+            release(session_id);
+        }
     }
 }
 
-void server::Scheduler::release(uint16_t session_id){
+void server::Scheduler::release(SessionId session_id){
     {
         std::lock_guard<std::mutex> lock(mutex_);
         queues_[session_id].active = false;
@@ -77,4 +97,22 @@ void server::Scheduler::release(uint16_t session_id){
     }
     
     ready_cv_.notify_one();
+}
+
+
+void server::Scheduler::Stop(){
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        stopping_ = true;
+    }
+
+    ready_cv_.notify_all();
+
+    if(th_.joinable())
+        th_.join();
+}
+
+size_t server::Scheduler::GetPendingTasks(){
+    std::lock_guard<std::mutex> lock(mutex_);
+    return pending_tasks_;
 }

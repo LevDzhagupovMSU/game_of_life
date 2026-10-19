@@ -16,18 +16,19 @@ server::Server::Server(boost::asio::io_context& io,
                        uint16_t port,
                        size_t num_threads,
                        size_t pool_size,
-                       size_t cache_capacity) : io_(io), address_(address), acceptor_(io, 
+                       size_t cache_capacity) : io_(io), acceptor_(io,
                                     boost::asio::ip::tcp::endpoint(
                                         boost::asio::ip::make_address(address),
-                                    port)), port_(port), num_threads_(num_threads), 
-                                    thread_pool(pool_size, worker_), scheduler_(thread_pool), worker_(cache_capacity) {};
+                                    port)), address_(address), port_(port), worker_(cache_capacity),
+                                    thread_pool(pool_size, worker_), scheduler_(thread_pool),
+                                    num_threads_(num_threads) {};
 
 server::Server::~Server() { Stop(); }
 
 void server::Server::Start() {
-    bool expected = false;
-    if(!started_.compare_exchange_strong(expected, true)){
-        std::cout << "Server already started" << std::endl;
+    State expected = State::Created;
+    if(!state_.compare_exchange_strong(expected, State::Running)){
+        std::cout << (expected == State::Running ? "Server already started" : "Server cannot be restarted") << std::endl;
         return;
     }
 
@@ -41,20 +42,30 @@ void server::Server::Start() {
 }
 
 void server::Server::Stop() {
-    bool expected = true;
-    if(!started_.compare_exchange_strong(expected, false)){
-        std::cout << "Server already stoped" << std::endl;
+    State expected = State::Running;
+    if(!state_.compare_exchange_strong(expected, State::Stopped)){
         return;
     }
+    std::cout << "Stopping server..." << std::endl;
 
     boost::beast::error_code ec;
+    std::cout << "Closing acceptor..." << std::endl;
     acceptor_.close(ec);
 
-    auto sessions = session_manager_.GetRunningSession();
+    std::cout << "Stopping all sessions..." << std::endl;
+    auto sessions = session_manager_.StopAll();
     for(auto& session : sessions){
         session->Stop();
     }
+    session_manager_.WaitForAllSessionsToStop();
 
+    std::cout << "Stopping scheduler..." << std::endl;
+    scheduler_.Stop();
+
+    std::cout << "Stopping thread pool..." << std::endl;
+    thread_pool.Stop();
+
+    io_.stop();
     for(auto& thread : threads_){
         if (thread.joinable()) {
             thread.join();
@@ -73,7 +84,12 @@ void server::Server::StartAccept() {
             std::cerr << "StartAccept: Accept error: " << ec.what() << std::endl;
             return;
         }
+
+        if(state_.load() != State::Running)
+            return;
+
         session_manager_.CreateSession(io_, std::move(socket), scheduler_);
-        StartAccept();   
+        if(state_.load() == State::Running)
+            StartAccept();
     });
 }

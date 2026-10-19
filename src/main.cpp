@@ -1,42 +1,39 @@
-#include <cstddef>
+#include <boost/asio/signal_set.hpp>
+#include <condition_variable>
+#include <csignal>
+#include <mutex>
 #include <iostream>
-#include <utility>
-
-#include "game/engine.hpp"
-#include "game/grid.hpp"
-
-namespace {
-
-void printGrid(const game::Grid& grid, std::size_t generation) {
-    std::cout << "Generation " << generation << '\n';
-    for (std::size_t y = 0; y < grid.height(); ++y) {
-        for (std::size_t x = 0; x < grid.width(); ++x) {
-            std::cout << (grid.at(x, y) == game::CellState::alive ? '#' : '.');
-        }
-        std::cout << '\n';
-    }
-    std::cout << '\n';
-}
-
-}
+#include "server/server.hpp"
 
 int main() {
-    game::Grid initial_grid(20, 10);
-    initial_grid.set(1, 1, game::CellState::alive);
-    initial_grid.set(2, 2, game::CellState::alive);
-    initial_grid.set(0, 3, game::CellState::alive);
-    initial_grid.set(1, 3, game::CellState::alive);
-    initial_grid.set(2, 3, game::CellState::alive);
+    try{
+        boost::asio::io_context io;
+        server::Server server(io, "0.0.0.0", 8080);
 
-    game::GameEngine engine(std::move(initial_grid));
-    constexpr std::size_t generations = 100;
+        std::mutex stop_mutex;
+        std::condition_variable stop_cv;
+        bool stop_requested = false;
+        boost::asio::signal_set signals(io, SIGINT, SIGTERM);
+        signals.async_wait([&](const boost::system::error_code& ec, int){
+            if(ec)
+                return;
+            {
+                std::lock_guard lock(stop_mutex);
+                stop_requested = true;
+            }
+            stop_cv.notify_one();
+        });
 
-    for (std::size_t generation = 0; generation <= generations; ++generation) {
-        printGrid(engine.grid(), generation);
-        if (generation < generations) {
-            engine.step();
+        server.Start();
+        std::unique_lock lock(stop_mutex);
+        stop_cv.wait(lock, [&]{ return stop_requested; });
+        lock.unlock();
+        server.Stop();
+    }catch(std::exception& e){
+            std::cerr << "Exception: " << e.what() << std::endl;
+
+
+            return 1;
         }
-    }
-
     return 0;
 }

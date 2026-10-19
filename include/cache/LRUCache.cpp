@@ -13,7 +13,7 @@ size_t cache::LRUCache::size() const {
     return order_.size();
 }
 
-void cache::LRUCache::Put(uint16_t key, std::shared_ptr<game::GameEngine> engine){
+void cache::LRUCache::Put(std::uint64_t key, std::shared_ptr<game::GameEngine> engine){
     std::lock_guard<std::mutex> lock(mutex_);
     if(capacity_ == 0)
         return;
@@ -36,7 +36,7 @@ void cache::LRUCache::Put(uint16_t key, std::shared_ptr<game::GameEngine> engine
     cache_.insert({key, order_.begin()});
 }
 
-std::weak_ptr<game::GameEngine> cache::LRUCache::Get(uint16_t key){
+std::weak_ptr<game::GameEngine> cache::LRUCache::Get(std::uint64_t key){
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = cache_.find(key);
     if(it != cache_.end()){

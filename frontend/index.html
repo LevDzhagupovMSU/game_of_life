@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0c1517">
+    <title>Game of Life — лаборатория</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <div class="brand-copy">
+          <span class="eyebrow">Клеточный автомат</span>
+          <h1>Game of Life</h1>
+        </div>
+        <div class="topbar-note">Эксперимент № 01 <span class="note-divider">/</span> Conway</div>
+      </header>
+
+      <main class="layout">
+        <section class="board-panel" aria-labelledby="board-title">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow accent">Поле эксперимента</span>
+              <h2 id="board-title">Создайте свою жизнь</h2>
+            </div>
+            <div class="board-size-pill" id="board-size-label">20 × 20</div>
+          </div>
+
+          <div class="board-stage" id="board-stage">
+            <canvas id="board" aria-label="Игровое поле. Нажмите или проведите мышью, чтобы изменить клетки"></canvas>
+          </div>
+
+          <div class="board-footer">
+            <p id="board-hint">Нажимайте и проводите по клеткам, чтобы нарисовать начальное состояние.</p>
+            <span class="legend"><i aria-hidden="true"></i> Живая клетка</span>
+          </div>
+
+          <div class="stats" aria-live="polite">
+            <div><span>Поколение</span><strong id="generation-value">00</strong></div>
+            <div><span>Живых клеток</span><strong id="alive-value">0</strong></div>
+            <div><span>Заполнение</span><strong id="density-value">0%</strong></div>
+          </div>
+        </section>
+
+        <aside class="controls" aria-label="Настройки игры">
+          <div class="control-section">
+            <span class="eyebrow accent">01 / Подключение</span>
+            <h2>Сервер</h2>
+            <label class="field-label" for="server-url">WebSocket-адрес</label>
+            <input class="server-input" id="server-url" type="url" spellcheck="false" autocomplete="url" aria-describedby="connection-status">
+            <div class="connection-status" id="connection-status" role="status"><span class="status-dot"></span><span id="status-text">Готово к запуску</span></div>
+          </div>
+
+          <div class="control-section">
+            <span class="eyebrow accent">02 / Геометрия</span>
+            <h2>Размер поля</h2>
+            <div class="range-heading"><label for="width-range">Ширина</label><output id="width-value" for="width-range">20</output></div>
+            <input id="width-range" type="range" min="3" max="40" value="20">
+            <div class="range-heading"><label for="height-range">Высота</label><output id="height-value" for="height-range">20</output></div>
+            <input id="height-range" type="range" min="3" max="40" value="20">
+            <p class="control-help" id="size-help">Размер можно изменить до первого запуска. После этого он закрепляется.</p>
+          </div>
+
+          <div class="control-section">
+            <span class="eyebrow accent">03 / Темп</span>
+            <h2>Интервал тика</h2>
+            <div class="range-heading"><label for="tick-range">Шаг каждые</label><output id="tick-value" for="tick-range">500 мс</output></div>
+            <input id="tick-range" type="range" min="100" max="2000" step="50" value="500">
+            <div class="range-ends"><span>Быстрее</span><span>Медленнее</span></div>
+            <p class="control-help">В каждый тик отправляется запрос на следующий шаг. Новый запрос ждёт ответа на предыдущий.</p>
+          </div>
+
+          <div class="actions">
+            <button class="primary-button" id="play-button" type="button"><span class="button-icon" aria-hidden="true">▶</span><span id="play-label">Запустить</span></button>
+            <div class="secondary-actions">
+              <button id="step-button" type="button">Один шаг</button>
+              <button id="reset-button" type="button">Новая партия</button>
+            </div>
+          </div>
+        </aside>
+      </main>
+
+      <footer class="site-footer"><span>Правила Конвея · Торическое поле</span><span>Клик — изменить клетку · Перетаскивание — рисовать</span></footer>
+    </div>
+  </body>
+</html>

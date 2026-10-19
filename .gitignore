@@ -11,3 +11,17 @@ CMakeCache.txt
 cmake_install.cmake
 CTestTestfile.cmake
 compile_commands.json
+
+# Frontend build artifacts (frontend sources stay tracked)
+/node_modules/
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Operating system metadata
+.DS_Store
+Thumbs.db

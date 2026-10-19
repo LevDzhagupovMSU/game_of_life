@@ -10,19 +10,20 @@
 #include <string>
 #include <condition_variable>
 #include <unordered_map>
+#include <variant>
 
 namespace server{
 
 class ThreadPool;
 
 struct Task{
-    using ResultHandler = std::function<void(WorkerResult)>;
+    using ResultHandler = std::function<void(std::variant<WorkerResult, std::string>)>;
 
-    uint16_t session_id;
+    SessionId session_id;
     std::string payload; 
     ResultHandler on_result;
 
-    Task(uint16_t session_id_, std::string payload_, ResultHandler on_result_);
+    Task(SessionId session_id_, std::string payload_, ResultHandler on_result_);
 };
 
 class Scheduler{
@@ -33,8 +34,8 @@ class Scheduler{
         bool in_ready_queue = false;
     };
 
-    std::unordered_map<uint16_t, SessionQueue> queues_;
-    std::queue<uint16_t> ready_sessions_;
+    std::unordered_map<SessionId, SessionQueue> queues_;
+    std::queue<SessionId> ready_sessions_;
     std::mutex mutex_;
     std::condition_variable ready_cv_;
     std::thread th_;
@@ -43,13 +44,15 @@ class Scheduler{
 
     ThreadPool& thread_pool_;
 
-    void release(uint16_t session_id);
+    void release(SessionId session_id);
     void DispatchLoop();
 public:
     Scheduler(ThreadPool& thread_pool);
+    ~Scheduler();
 
     void Submit(Task task);
     void Stop();
+    size_t GetPendingTasks();
 };
 
 }

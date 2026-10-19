@@ -6,6 +6,7 @@
 #include "server/worker.hpp"
 
 #include <boost/asio.hpp>
+#include <condition_variable>
 #include <cstddef>
 #include <vector>
 #include <thread>
@@ -15,7 +16,8 @@
 namespace server{
 
 class Server{
-    std::atomic<bool> started_ = false;
+    enum class State { Created, Running, Stopped };
+    std::atomic<State> state_{State::Created};
     boost::asio::io_context& io_;
     boost::asio::ip::tcp::acceptor acceptor_;
     std::string address_;
@@ -43,8 +45,8 @@ public:
     Server(const Server&) = delete;
     Server& operator=(const Server&) = delete;
 
-    Server(Server&&);            // ради интереса
-    Server& operator=(Server&&); // ради интереса
+    Server(Server&&) = delete;
+    Server& operator=(Server&&) = delete;
 
     void Start();
     void Stop();

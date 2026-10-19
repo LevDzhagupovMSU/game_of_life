@@ -2,10 +2,14 @@
 #include "server/scheduler.hpp"
 #include "server/worker.hpp"
 
+#include <functional>
 #include <mutex>
 #include <optional>
 
 server::ThreadPool::ThreadPool(size_t thread_count, Worker& worker) : worker_(worker){
+    if(thread_count == 0)
+        throw std::invalid_argument("Thread count must be greater than zero");
+
     for(int i = 0; i < thread_count; ++i){
         threads_.emplace_back([this]{
             Run();
@@ -48,6 +52,8 @@ void server::ThreadPool::Post(Job job) {
 void server::ThreadPool::Run(){
     for(;;){
         std::optional<Job> job;
+        std::function<void()> job_callback;
+        Task::ResultHandler on_result;
         {
             std::unique_lock<std::mutex> lock(mutex_);
 
@@ -59,13 +65,19 @@ void server::ThreadPool::Run(){
                 return;
 
             job.emplace(std::move(jobs_.front()));
+            job_callback = job->on_callback;
+            on_result = job->task.on_result;
             jobs_.pop();
         }
 
         try{
             worker_.Work(std::move(job.value()));
+        }catch(const std::exception& e) {
+            try { on_result(std::string(e.what())); } catch(...) {}
+            job_callback();
         }catch(...) {
-            job->on_callback();
+            try { on_result(std::string("Task processing failed")); } catch(...) {}
+            job_callback();
         }
     }
 }

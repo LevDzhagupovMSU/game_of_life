@@ -40,6 +40,7 @@ add_executable(game_of_life_tests
     src/game/grid.cpp
     src/game/rules.cpp
     src/server/parse.cpp
+    src/server/generator_id.cpp
 )
 
 target_include_directories(game_of_life_tests PRIVATE include)

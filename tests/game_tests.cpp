@@ -12,6 +12,7 @@
 #include "game/grid.hpp"
 #include "game/rules.hpp"
 #include "server/message.hpp"
+#include "server/generator_id.hpp"
 #include <nlohmann/json.hpp>
 
 namespace {
@@ -97,6 +98,17 @@ void testParsePayloadAndGridResult() {
     }, "Parse must reject malformed JSON");
 }
 
+void testSessionIdsBeyond16Bits() {
+    server::IDGenerator generator;
+    for (std::uint64_t expected = 1; expected <= 65537; ++expected)
+        require(generator.next() == expected, "Session IDs must remain unique past 16-bit range");
+
+    game::Grid grid(3, 3);
+    const auto payload = server::Parse::to_payload(server::Parse::from_grid(grid, 65537));
+    require(nlohmann::json::parse(payload).at("session_id").get<std::uint64_t>() == 65537,
+            "Response must retain a 64-bit session ID");
+}
+
 void testConwayRules() {
     using game::CellState;
     require(game::ConwayRules::nextState(CellState::alive, 2) == CellState::alive, "Live cell with two neighbors survives");
@@ -136,6 +148,7 @@ int main() {
         testGridRejectsInvalidDimensionsAndIndex();
         testTorusNeighborsWrapAtCorner();
         testParsePayloadAndGridResult();
+        testSessionIdsBeyond16Bits();
         testConwayRules();
         testBlinkerCrossesTorusEdgeAndOscillates();
         testEmptyGridRemainsEmpty();

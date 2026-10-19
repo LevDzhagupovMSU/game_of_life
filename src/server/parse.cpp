@@ -30,11 +30,32 @@ server::ClientMessage server::Parse::from_payload(const std::string& payload) {
     return message;
 }
 
-server::WorkerResult server::Parse::from_grid(const game::Grid& grid, std::uint16_t session_id) {
+server::WorkerResult server::Parse::from_grid(const game::Grid& grid, SessionId session_id) {
     WorkerResult result;
     result.session_id = session_id;
     result.state.reserve(grid.cells().size());
     for (const auto& cell : grid.cells())
         result.state.push_back(cell.state);
     return result;
+}
+
+std::string server::Parse::to_payload(const WorkerResult& result) {
+    nlohmann::json json;
+    json["session_id"] = result.session_id;
+    json["state"] = nlohmann::json::array();
+
+    for (const auto cell_state : result.state) {
+        switch (cell_state) {
+        case game::CellState::dead:
+            json["state"].push_back(0);
+            break;
+        case game::CellState::alive:
+            json["state"].push_back(1);
+            break;
+        default:
+            throw std::invalid_argument("Unknown cell state");
+        }
+    }
+
+    return json.dump();
 }

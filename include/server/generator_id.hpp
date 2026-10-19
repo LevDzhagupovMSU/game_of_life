@@ -6,11 +6,9 @@
 namespace server {
 
 class IDGenerator{
-    std::atomic<uint16_t> counter{0};
-    
-    static uint16_t mix(uint16_t x);
+    std::atomic<std::uint64_t> counter{1};
 public:
-    uint16_t next();
+    std::uint64_t next();
 };
 
 }
