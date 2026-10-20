@@ -1,6 +1,7 @@
 #pragma once
 
 #include "server/scheduler.hpp"
+#include "logging/syslog_logger.hpp"
 
 #include <cstddef>
 #include <functional>
@@ -31,11 +32,12 @@ private:
     std::mutex mutex_;
     std::condition_variable ready_cv_;
     Worker& worker_;
+    logging::SyslogLogger& logger_;
     bool stopping_ = false;
 
     void Run();
 public:
-    explicit ThreadPool(size_t thread_count, Worker& worker);
+    explicit ThreadPool(size_t thread_count, Worker& worker, logging::SyslogLogger& logger);
 
     ThreadPool(const ThreadPool&) = delete;
     ThreadPool& operator=(const ThreadPool&) = delete;

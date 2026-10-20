@@ -2,7 +2,6 @@
 #include "server/thread_pool.hpp"
 
 #include <condition_variable>
-#include <cstdint>
 #include <mutex>
 #include <optional>
 #include <stdexcept>
@@ -12,8 +11,8 @@
 server::Task::Task(SessionId session_id_, std::string payload_, ResultHandler on_result_) :
                     session_id(session_id_), payload(std::move(payload_)), on_result(std::move(on_result_)) {};
 
-server::Scheduler::Scheduler(server::ThreadPool& thread_pool) : 
-                    thread_pool_(thread_pool), th_([this]{ DispatchLoop(); }) {};
+server::Scheduler::Scheduler(server::ThreadPool& thread_pool, logging::SyslogLogger& logger) : 
+                    thread_pool_(thread_pool), logger_(logger), th_([this]{ DispatchLoop(); }) {};
 
 server::Scheduler::~Scheduler(){
     Stop();
@@ -23,8 +22,10 @@ void server::Scheduler::Submit(Task task){
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
-        if(stopping_)
+        if(stopping_){
+            logger_.error("Scheduler is stopping, cannot submit new tasks");
             throw std::runtime_error("Scheduler is stopping, cannot submit new tasks");
+        }
 
         SessionId id = task.session_id;
         queues_[task.session_id].tasks.push(std::move(task));
@@ -52,6 +53,7 @@ void server::Scheduler::DispatchLoop(){
             });
 
             if(stopping_ && pending_tasks_ == 0){
+                logger_.info("Scheduler stopping, no pending tasks left.");
                 return;
             }
 

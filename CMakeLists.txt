@@ -21,6 +21,7 @@ add_executable(game_of_life
     src/server/thread_pool.cpp
     src/server/worker.cpp
     include/cache/LRUCache.cpp
+    src/logging/syslog_logger.cpp
     src/server/parse.cpp
     src/server/generator_id.cpp
 )

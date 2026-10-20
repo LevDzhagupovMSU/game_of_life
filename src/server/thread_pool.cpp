@@ -6,9 +6,11 @@
 #include <mutex>
 #include <optional>
 
-server::ThreadPool::ThreadPool(size_t thread_count, Worker& worker) : worker_(worker){
-    if(thread_count == 0)
+server::ThreadPool::ThreadPool(size_t thread_count, Worker& worker, logging::SyslogLogger& logger) : worker_(worker), logger_(logger){
+    if(thread_count == 0){
+        logger_.error("Thread count must be greater than zero");
         throw std::invalid_argument("Thread count must be greater than zero");
+    }
 
     for(int i = 0; i < thread_count; ++i){
         threads_.emplace_back([this]{
@@ -40,8 +42,10 @@ void server::ThreadPool::Post(Job job) {
     {
         std::lock_guard lock(mutex_);
 
-        if (stopping_)
+        if (stopping_){
+            logger_.warning("ThreadPool is stopping");
             throw std::runtime_error("ThreadPool is stopping");
+        }
 
         jobs_.push(std::move(job));
     }

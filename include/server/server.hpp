@@ -4,9 +4,9 @@
 #include "server/scheduler.hpp"
 #include "server/thread_pool.hpp"
 #include "server/worker.hpp"
+#include "logging/syslog_logger.hpp"
 
 #include <boost/asio.hpp>
-#include <condition_variable>
 #include <cstddef>
 #include <vector>
 #include <thread>
@@ -23,11 +23,11 @@ class Server{
     std::string address_;
     uint16_t port_;
 
+    logging::SyslogLogger logger_;
     SessionManager session_manager_;
     Worker worker_;
     ThreadPool thread_pool;
-    Scheduler scheduler_;
-
+    Scheduler scheduler_;;
     std::vector<std::thread> threads_;
     size_t num_threads_;
 
@@ -44,7 +44,6 @@ public:
 
     Server(const Server&) = delete;
     Server& operator=(const Server&) = delete;
-
     Server(Server&&) = delete;
     Server& operator=(Server&&) = delete;
 

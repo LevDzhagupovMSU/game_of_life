@@ -1,8 +1,8 @@
 #pragma once
 
 #include "server/message.hpp"
+#include "logging/syslog_logger.hpp"
 
-#include <cstdint>
 #include <functional>
 #include <mutex>
 #include <queue>
@@ -39,15 +39,16 @@ class Scheduler{
     std::mutex mutex_;
     std::condition_variable ready_cv_;
     std::thread th_;
+
     bool stopping_ = false;
     size_t pending_tasks_ = 0;
 
     ThreadPool& thread_pool_;
-
+    logging::SyslogLogger& logger_;
     void release(SessionId session_id);
     void DispatchLoop();
 public:
-    Scheduler(ThreadPool& thread_pool);
+    Scheduler(ThreadPool& thread_pool, logging::SyslogLogger& logger);
     ~Scheduler();
 
     void Submit(Task task);

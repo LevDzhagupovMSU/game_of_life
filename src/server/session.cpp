@@ -9,17 +9,17 @@
 #include <boost/beast/core/error.hpp>
 #include <boost/system/detail/error_code.hpp>
 #include <chrono>
-#include <cstdint>
-#include <iostream>
 
 server::Session::Session(boost::asio::io_context& io, 
                          boost::asio::ip::tcp::socket socket,
                          Scheduler& scheduler, SessionId id,
-                         StopCallback stop_callback) : web_socket_(std::move(socket)),
-                                                       strand_(boost::asio::make_strand(io)),
-                                                       close_timer_(io),
-                                                       scheduler_(scheduler),
-                                                       id_(id), stop_callback_(std::move(stop_callback)) {};
+                         StopCallback stop_callback, 
+                         logging::SyslogLogger& logger) : web_socket_(std::move(socket)),
+                                                          strand_(boost::asio::make_strand(io)),
+                                                          close_timer_(io),
+                                                          scheduler_(scheduler),
+                                                          logger_(logger),
+                                                          id_(id), stop_callback_(std::move(stop_callback)) {};
 
 server::SessionId server::Session::get_id() const{ return id_; }
 
@@ -43,37 +43,49 @@ void server::Session::DoHandShake(const HandShakeCallBack& HSCB){
 void server::Session::Start(){
     auto expected = server::SessionState::Connecting;
     if(!state_.compare_exchange_strong(expected, server::SessionState::Running,
-                                       std::memory_order_acq_rel))
+                                       std::memory_order_acq_rel)){
+        logger_.error("Session::Start: Invalid state transition from " + std::to_string(static_cast<int>(expected)) + " to Running");
         return;
+    }
     Read();
 }
 
 void server::Session::Stop(){
     auto previous = state_.exchange(server::SessionState::Disconnecting,
                                     std::memory_order_acq_rel);
-    if(previous == server::SessionState::Disconnecting)
+    if(previous == server::SessionState::Disconnecting){
+        logger_.error("Session::Stop: Invalid state transition from " + std::to_string(static_cast<int>(previous)) + " to Disconnecting");
         return;
+    }
     boost::asio::post(strand_, [self = shared_from_this(), previous](){
-        if(self->finished_.load(std::memory_order_acquire))
+        if(self->finished_.load(std::memory_order_acquire)){
+            self->logger_.error("Session::Stop: Session already finished");
             return;
+        }
 
         self->close_requested_ = true;
         if(previous != server::SessionState::Running || !self->web_socket_.is_open()){
+            self->logger_.info("Session::Stop: Session is not running or websocket is closed, finishing session.");
             self->Finish();
             return;
         }
 
-        while(self->message_queue_.size() > (self->write_in_progress_ ? 1u : 0u))
+        while(self->message_queue_.size() > (self->write_in_progress_ ? 1u : 0u)){
             self->message_queue_.pop_back();
+        }
 
-        if(!self->write_in_progress_)
+        if(!self->write_in_progress_){
+            self->logger_.info("Session::Stop: No write in progress, closing session.");
             self->CloseWhenReady();
+        }
     });
 }
 
 void server::Session::Finish(){
-    if(finished_.exchange(true, std::memory_order_acq_rel))
+    if(finished_.exchange(true, std::memory_order_acq_rel)){
+        logger_.warning("Session::Finish: Session already finished");    
         return;
+    }
 
     state_.store(server::SessionState::Disconnecting, std::memory_order_release);
     close_timer_.cancel();
@@ -94,7 +106,7 @@ void server::Session::Read(){
         
         if(ec){
             if(ec != boost::beast::websocket::error::closed)
-                std::cerr << "Session read error: " << ec.what() << std::endl;
+                self->logger_.error("Session read error: " + ec.message());
             self->Finish();
             return;
         }
@@ -117,23 +129,29 @@ void server::Session::Read(){
 }
 
 void server::Session::Send(server::WorkerResult worker_result){
-    if(get_state() != server::SessionState::Running)
+    if(get_state() != server::SessionState::Running){
+        logger_.warning("Session::Send: Session is not running");
         return;
+    }
 
     SendPayload(Parse::to_payload(worker_result));
 }
 
 void server::Session::SendError(std::string error){
-    if(get_state() != server::SessionState::Running)
+    if(get_state() != server::SessionState::Running){
+        logger_.warning("Session::SendError: Session is not running");
         return;
+    }
     SendPayload(nlohmann::json{{"error", std::move(error)}}.dump());
 }
 
 void server::Session::SendPayload(std::string payload){
     boost::asio::post(strand_, [self = shared_from_this(), payload = std::move(payload)]() mutable {
         if(self->get_state() != server::SessionState::Running ||
-           self->finished_.load(std::memory_order_acquire))
+           self->finished_.load(std::memory_order_acquire)){
+            self->logger_.warning("Session::SendPayload: Session is not running or has finished");
             return;
+        }
 
         self->message_queue_.push_back(std::move(payload));
         if(!self->write_in_progress_)
@@ -157,7 +175,7 @@ void server::Session::SendNextMessage(){
 
                 if(ec){
                     if(self->get_state() == server::SessionState::Running)
-                        std::cerr << "Session write error: " << ec.what() << std::endl;
+                        self->logger_.error("Session write error: " + ec.message());
                     self->Finish();
                     return;
                 }
@@ -190,14 +208,16 @@ void server::Session::CloseWhenReady(){
     close_timer_.expires_after(std::chrono::seconds(2));
     close_timer_.async_wait(boost::asio::bind_executor(strand_,
         [self = shared_from_this()](const boost::beast::error_code& ec){
-            if(!ec)
+            if(!ec){
+                self->logger_.warning("Session close timeout, forcing close.");
                 self->Finish();
+            }
         }));
     web_socket_.async_close(boost::beast::websocket::close_code::normal,
         boost::asio::bind_executor(strand_, [self = shared_from_this()]
             (const boost::beast::error_code& ec){
                 if(ec && !self->finished_.load(std::memory_order_acquire))
-                    std::cerr << "Session close error: " << ec.what() << std::endl;
+                    self->logger_.error("Session close error: " + ec.message());
                 self->Finish();
             }));
 }

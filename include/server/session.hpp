@@ -2,11 +2,11 @@
 
 #include "server/message.hpp"
 #include "server/scheduler.hpp"
+#include "logging/syslog_logger.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
 #include <atomic>
-#include <cstdint>
 #include <deque>
 #include <functional>
 #include <memory>
@@ -28,6 +28,7 @@ private:
     boost::asio::streambuf buffer_;
 
     Scheduler& scheduler_;
+    logging::SyslogLogger& logger_;
     std::deque<std::string> message_queue_;
     bool write_in_progress_ = false;
     bool close_requested_ = false;
@@ -52,7 +53,7 @@ public:
     Session(boost::asio::io_context& io, 
             boost::asio::ip::tcp::socket socket, 
             Scheduler& scheduler, SessionId id,
-            StopCallback stop_callback);
+            StopCallback stop_callback, logging::SyslogLogger& logger);
 
     ~Session() = default;
 

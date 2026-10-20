@@ -3,7 +3,7 @@
 #include "server/message.hpp"
 #include "server/scheduler.hpp"
 
-#include <cstdint>
+
 #include <functional>
 #include <memory>
 #include <mutex>
