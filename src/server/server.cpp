@@ -16,7 +16,13 @@ server::Server::Server(boost::asio::io_context& io,
                                     port)), address_(address), port_(port), worker_(cache_capacity),
                                     thread_pool(pool_size, worker_, logger_), scheduler_(thread_pool, logger_),
                                     num_threads_(num_threads), logger_("game_of_life", LOG_DAEMON),
-                                    session_manager_(scheduler_,logger_) {};
+                                    session_manager_(scheduler_,logger_) {
+                                        if(num_threads_ == 0){
+                                            throw std::invalid_argument("Number of threads must be greater than 0");
+                                        }else if(num_threads_ > std::thread::hardware_concurrency()){
+                                            logger_.warning("Number of threads exceeds hardware concurrency, performance may be degraded.");
+                                        }
+                                    };
 
 server::Server::~Server() { Stop(); }
 
@@ -66,6 +72,7 @@ void server::Server::Stop() {
             thread.join();
         }
     }
+    logger_.info("Server stopped.");
 }
 
 

@@ -10,6 +10,8 @@ server::ThreadPool::ThreadPool(size_t thread_count, Worker& worker, logging::Sys
     if(thread_count == 0){
         logger_.error("Thread count must be greater than zero");
         throw std::invalid_argument("Thread count must be greater than zero");
+    }else if(thread_count > std::thread::hardware_concurrency()){
+        logger_.warning("Thread count exceeds hardware concurrency, performance may be degraded");
     }
 
     for(int i = 0; i < thread_count; ++i){

@@ -35,7 +35,7 @@ class Server{
 public:
     Server(boost::asio::io_context& io, 
            const std::string& address,
-           uint16_t port = 5050,
+           uint16_t port,
            size_t num_threads = 4,
            size_t pool_size = 2,
            size_t cache_capacity = 1000);
