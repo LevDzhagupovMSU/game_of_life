@@ -23,8 +23,8 @@ class SessionManager{
     std::condition_variable cv_;
     mutable std::mutex mutex_;
     bool stopping_ = false;
-    logging::SyslogLogger& logger_;
     Scheduler& scheduler_;
+    logging::SyslogLogger& logger_;
 
 public:
     SessionManager(Scheduler& scheduler, logging::SyslogLogger& logger);

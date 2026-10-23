@@ -14,10 +14,23 @@ server::ThreadPool::ThreadPool(size_t thread_count, Worker& worker, logging::Sys
         logger_.warning("Thread count exceeds hardware concurrency, performance may be degraded");
     }
 
-    for(int i = 0; i < thread_count; ++i){
-        threads_.emplace_back([this]{
-            Run();
-        });
+    try {
+        for(std::size_t i = 0; i < thread_count; ++i){
+            threads_.emplace_back([this]{
+                Run();
+            });
+        }
+    } catch (...) {
+        {
+            std::lock_guard lock(mutex_);
+            stopping_ = true;
+        }
+        ready_cv_.notify_all();
+        for(auto& thread : threads_){
+            if(thread.joinable())
+                thread.join();
+        }
+        throw;
     }
 }
 

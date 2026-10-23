@@ -8,15 +8,16 @@
 server::Server::Server(boost::asio::io_context& io, 
                        const std::string& address,
                        uint16_t port,
+                       logging::SyslogLogger& logger,
                        size_t num_threads,
                        size_t pool_size,
                        size_t cache_capacity) : io_(io), acceptor_(io,
                                     boost::asio::ip::tcp::endpoint(
                                         boost::asio::ip::make_address(address),
-                                    port)), address_(address), port_(port), worker_(cache_capacity),
+                                    port)), address_(address), port_(port), logger_(logger),
+                                    worker_(cache_capacity),
                                     thread_pool(pool_size, worker_, logger_), scheduler_(thread_pool, logger_),
-                                    num_threads_(num_threads), logger_("game_of_life", LOG_DAEMON),
-                                    session_manager_(scheduler_,logger_) {
+                                    session_manager_(scheduler_, logger_), num_threads_(num_threads) {
                                         if(num_threads_ == 0){
                                             throw std::invalid_argument("Number of threads must be greater than 0");
                                         }else if(num_threads_ > std::thread::hardware_concurrency()){
@@ -35,7 +36,7 @@ void server::Server::Start() {
 
     StartAccept();
 
-    for(int i = 0; i < num_threads_; ++i){
+    for(std::size_t i = 0; i < num_threads_; ++i){
         threads_.emplace_back([this](){
             io_.run();
         });

@@ -38,13 +38,12 @@ class Scheduler{
     std::queue<SessionId> ready_sessions_;
     std::mutex mutex_;
     std::condition_variable ready_cv_;
-    std::thread th_;
-
     bool stopping_ = false;
     size_t pending_tasks_ = 0;
 
     ThreadPool& thread_pool_;
     logging::SyslogLogger& logger_;
+    std::thread th_;
     void release(SessionId session_id);
     void DispatchLoop();
 public:

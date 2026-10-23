@@ -6,8 +6,9 @@
 namespace logging {
 
 class SyslogLogger {
+    std::string ident_;
 public:
-    SyslogLogger(const std::string& ident, int facility);
+    SyslogLogger(std::string ident, int facility, int options = LOG_PID | LOG_NDELAY);
 
     ~SyslogLogger();
 

@@ -1,9 +1,12 @@
 #include "logging/syslog_logger.hpp"
 
+#include <utility>
+
 namespace logging {
 
-SyslogLogger::SyslogLogger(const std::string& ident, int facility) {
-    openlog(ident.c_str(), LOG_PID | LOG_NDELAY, facility);
+SyslogLogger::SyslogLogger(std::string ident, int facility, int options)
+    : ident_(std::move(ident)) {
+    openlog(ident_.c_str(), options, facility);
 }
 
 SyslogLogger::~SyslogLogger() {
